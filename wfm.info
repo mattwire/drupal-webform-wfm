@@ -1,0 +1,6 @@
+name = Webform Multiple
+description = Allows multiple entries per component.
+core = 7.x
+package = Webform
+dependencies[] = webform
+stylesheets[all][] = styles.css
