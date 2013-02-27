@@ -23,13 +23,13 @@ function wfm_form_webform_component_edit_form_alter(&$form, &$form_state) {
     '#type' => 'select',
     '#title' => t('Maximum number of values'),
     '#description' => t("The maximum number of values users can enter for this component. 'Unlimited' will allow users to add as many values as they like."),
-    '#options' => drupal_map_assoc(array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)) + array(WFM_UNLIMITED => t('Unlimited')),
+    '#options' => drupal_map_assoc(range(1, 10)) + array(WFM_UNLIMITED => t('Unlimited')),
     '#default_value' => _wfm_get_max_items($component),
   );
   $form['wfm']['min_items'] = array(
     '#type' => 'select',
     '#title' => t('Initial (fixed) number of values'),
-    '#options' => drupal_map_assoc(array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)),
+    '#options' => drupal_map_assoc(range(1, 10)),
     '#default_value' => _wfm_get_min_items($component),
     '#states' => array(
       'invisible' => array(
@@ -356,14 +356,16 @@ function _wfm_get_max_items(array $component) {
 }
 
 /**
- * Get the add_more text of a component.
+ * Get the sanitized 'add more' text of a component.
+ *
+ * Default: 'Add another item'.
  *
  * @return string
  */
 function _wfm_get_add_text(array $component) {
   $add_more_text = t('Add another item');
   if (isset($component['extra']['wfm_add_more_text'])) {
-    $add_more_text = $component['extra']['wfm_add_more_text'];
+    $add_more_text = check_plain($component['extra']['wfm_add_more_text']);
   }
   return $add_more_text;
 }
