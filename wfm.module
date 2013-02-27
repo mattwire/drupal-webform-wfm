@@ -135,43 +135,6 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
       _wfm_process($form['submitted'][$form_key], $form_state);
     }
   }
-  $form['#after_build'][] = '_wfm_after_build';
-  array_unshift($form['#validate'], 'wfm_validate');
-}
-
-/**
- * After build callback for the Webform client form.
- */
-function _wfm_after_build($form, &$form_state) {
-  if (count($form_state['input'])) {
-    _wfm_set_values($form['submitted'], $form_state);
-  }
-  return $form;
-}
-
-/**
- * Recursively set the element values for the form.
- */
-function _wfm_set_values(&$elements, &$form_state) {
-  if ($children = element_children($elements)) {
-    foreach ($children as $key) {
-      _wfm_set_values($elements[$key], $form_state);
-    }
-    return;
-  }
-  if (!isset($elements['#webform_component'])) {
-    return;
-  }
-  $value = drupal_array_get_nested_value($form_state['input'], $elements['#array_parents']);
-  $elements['#value'] = $value;
-  form_set_value($elements, $value, $form_state);
-}
-
-/**
- * Validate the webform before any other validators have run.
- */
-function wfm_validate(&$form, &$form_state) {
-  // @todo validation extras
 }
 
 /**
