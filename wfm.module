@@ -85,7 +85,6 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
   foreach ($node->webform['components'] as $cid => $component) {
     $form_key = $component['form_key'];
     // Move component children under the parent element.
-    // @todo make this recursive
     if ($component['pid'] > 0) {
       $parent_component = $node->webform['components'][$component['pid']];
       $parent_component_key = $parent_component['form_key'];
@@ -337,7 +336,7 @@ function wfm_submit($form, &$form_state) {
       if (!$set) {
         continue;
       }
-      
+
       // Recursively check if the value is empty (equivalent to 0), and if so
       // stop processing.
       $value = _wfm_filter_recursive($value);
@@ -360,7 +359,7 @@ function wfm_submit($form, &$form_state) {
       }
 
       foreach ($parents as $key => $parent) {
-        if (is_integer($parent)) {
+        if (is_int($parent)) {
           unset($parents[$key]);
         }
       }
@@ -414,8 +413,6 @@ function _wfm_component_element_render($component) {
 
 /**
  * Check whether a component takes multiple values.
- *
- * @return bool
  */
 function _wfm_is_multiple($component) {
   $max_items = _wfm_get_max_items($component);
@@ -426,8 +423,6 @@ function _wfm_is_multiple($component) {
  * Get the max_items of a component.
  *
  * This is the equivalent of 'cardinality' in the Field system.
- *
- * @return int|WFM_UNLIMITED
  */
 function _wfm_get_max_items(array $component) {
   $max_items = 1;
@@ -441,8 +436,6 @@ function _wfm_get_max_items(array $component) {
  * Get the sanitized 'add more' text of a component.
  *
  * Default: 'Add another item'.
- *
- * @return string
  */
 function _wfm_get_add_text(array $component) {
   $add_more_text = t('Add another item');
@@ -454,8 +447,6 @@ function _wfm_get_add_text(array $component) {
 
 /**
  * Get the minimum number of items of a component.
- *
- * @return int
  */
 function _wfm_get_min_items(array $component) {
   $min_items = 1;
