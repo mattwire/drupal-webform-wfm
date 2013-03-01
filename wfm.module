@@ -110,7 +110,7 @@ function _wfm_process_elements(&$element, &$form_state) {
   $cid = $component['cid'];
   $element_name = isset($element['#name']) ? $element['#name'] : "submitted[$form_key]";
   $element_parents = isset($element['#parents']) ? $element['#parents'] : array('submitted', $form_key);
-  $form_state['wfm_parents'][$cid][implode('.', $element_parents)] = $element_parents;
+  $form_state['wfm_ancestors'][$cid][implode('.', $element_parents)] = $element_parents;
   if (!_wfm_is_multiple($component)) {
     return;
   }
@@ -203,7 +203,7 @@ function _wfm_process_elements(&$element, &$form_state) {
         $sub_item['#name'] = $item['#name'] . "[$sub_component_key]";
         $sub_item['#parents'] = $item['#parents'];
         $sub_item['#parents'][] = $sub_component_key;
-        $form_state['wfm_parents'][$scid][implode('.', $sub_item['#parents'])] = $sub_item['#parents'];
+        $form_state['wfm_ancestors'][$scid][implode('.', $sub_item['#parents'])] = $sub_item['#parents'];
         // Recursively process any multiple-value children.
         _wfm_process_elements($sub_item, $form_state);
       }
@@ -314,25 +314,32 @@ function wfm_submit($form, &$form_state) {
    */
   $node = $form['#node'];
   $components = $node->webform['components'];
-  $component_parents = $form_state['wfm_parents'];
+  $component_ancestors = $form_state['wfm_ancestors'];
   $values = array();
   // Go through all the non-group components, getting their values and
   // identifying where they should have extra identification added describing
   // the hierarchy of their parents.
   foreach ($components as $cid => $component) {
-    if (!isset($component_parents[$cid])) {
+    // Only act on components that were processed by Webform Multiple.
+    if (!isset($component_ancestors[$cid])) {
       continue;
     }
+
+    // Only act on non-group components.
     if (webform_component_feature($component['type'], 'group')) {
       continue;
     }
-    // Loop through all the possible parent structures for this component.
-    foreach ($component_parents[$cid] as $parents) {
-      // Remove 'submitted' from the parents array.
-      array_shift($parents);
+
+    // Check whether the component, or any of its ancestors, is multiple-value.
+    $is_multiple_recursive = _wfm_is_multiple_recursive($component, $components);
+
+    // Loop through all the possible family trees for this component.
+    foreach ($component_ancestors[$cid] as $ancestors) {
+      // Remove 'submitted' from the ancestors array.
+      array_shift($ancestors);
 
       // Get the component's value.
-      $value = drupal_array_get_nested_value($form_state['values']['submitted'], $parents, $set);
+      $value = drupal_array_get_nested_value($form_state['values']['submitted'], $ancestors, $set);
       if (!$set) {
         continue;
       }
@@ -344,29 +351,42 @@ function wfm_submit($form, &$form_state) {
         continue;
       }
 
-      // If this component is a child, then prefix its  {webform}.`num` value
-      // with a string describing the component's parents.
-      $parents_count = count($parents);
-      if ($parents_count > 1) {
-        $delta_prefix = implode(WFM_SEPARATOR, array_slice($parents, 0, $parents_count - 1));
-        $value = (array) $value;
-        $prefixed_value = array();
+      // Make sure the value is an array;
+      $value = (array) $value;
+
+      // If this component is multiple-value, or if it's a descendant of any
+      // multiple-value components, then prefix each of its array keys with a
+      // string describing the component's ancestors. The array keys are used in
+      // the database column {webform_submitted_data}.`no`.
+      $ancestors_count = count($ancestors);
+      if ($ancestors_count > 1 && $is_multiple_recursive) {
+        $delta_prefix = '';
+        // Each array key will be something like
+        // 'greatgrandparent|grandparent:1|parent|0', where the integers
+        // represent $delta keys.
+        foreach ($ancestors as $key => $ancestor) {
+          if ($key < $ancestors_count - 1) {
+            if ($key > 0) {
+              $delta_prefix .= is_int($ancestor) ? ':' : '|';
+            }
+            $delta_prefix .= $ancestor;
+          }
+        }
+        $value_prefixed = array();
         foreach ($value as $delta => $sub_value) {
           $new_delta = $delta_prefix . WFM_SEPARATOR . $delta;
-          $prefixed_value[$new_delta] = $sub_value;
+          $value_prefixed[$new_delta] = $sub_value;
         }
-        $value = $prefixed_value;
+        $value = $value_prefixed;
       }
 
-      foreach ($parents as $key => $parent) {
-        if (is_int($parent)) {
-          unset($parents[$key]);
-        }
-      }
-      foreach ((array) $value as $key => $data) {
-        $parents_value = $parents;
-        $parents_value[] = $key;
-        drupal_array_set_nested_value($values, $parents_value, $data, TRUE);
+      // Add each value to the $values array, with a similar structure but
+      // now with only string array keys (i.e. remove the $delta keys).
+      $ancestors = array_filter($ancestors, 'is_string');
+      foreach ($value as $key => $data) {
+        $value_parents = $ancestors;
+        $value_parents[] = $key;
+        drupal_array_set_nested_value($values, $value_parents, $data, TRUE);
       }
     }
   }
@@ -376,6 +396,8 @@ function wfm_submit($form, &$form_state) {
 
 /**
  * Filter an array recursively.
+ *
+ * If all of the array's values are '' or NULL return NULL.
  */
 function _wfm_filter_recursive($array) {
   if (!is_array($array)) {
@@ -386,7 +408,7 @@ function _wfm_filter_recursive($array) {
     if (is_array($value)) {
       $value = _wfm_filter_recursive($value);
     }
-    if ($value) {
+    if (is_array($value) || ($value !== '' && $value !== NULL)) {
       $filled = TRUE;
     }
   }
@@ -417,6 +439,19 @@ function _wfm_component_element_render($component) {
 function _wfm_is_multiple($component) {
   $max_items = _wfm_get_max_items($component);
   return $max_items > 1 || $max_items == WFM_UNLIMITED;
+}
+
+/**
+ * Check whether a component, or any of its ancestors, takes multiple values.
+ */
+function _wfm_is_multiple_recursive($component, $components) {
+  if ($component['pid'] != 0 && isset($components[$component['pid']])) {
+    $parent_component = $components[$component['pid']];
+    if (_wfm_is_multiple_recursive($parent_component, $components)) {
+      return TRUE;
+    }
+  }
+  return _wfm_is_multiple($component);
 }
 
 /**
