@@ -5,7 +5,6 @@
  */
 
 define('WFM_UNLIMITED', -1);
-define('WFM_SEPARATOR', '|');
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -374,7 +373,7 @@ function wfm_submit($form, &$form_state) {
         }
         $value_prefixed = array();
         foreach ($value as $delta => $sub_value) {
-          $new_delta = $delta_prefix . WFM_SEPARATOR . $delta;
+          $new_delta = $delta_prefix . '|' . $delta;
           $value_prefixed[$new_delta] = $sub_value;
         }
         $value = $value_prefixed;
