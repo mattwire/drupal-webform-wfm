@@ -360,11 +360,12 @@ function wfm_submit($form, &$form_state) {
       $ancestors_count = count($ancestors);
       if ($ancestors_count > 1 && $is_multiple_recursive) {
         $delta_prefix = '';
-        // Each array key will be something like
-        // 'greatgrandparent|grandparent:1|parent|0', where the integers
-        // represent $delta keys.
+        // Each array key will be prefixed by something like
+        // 'greatgrandparent|grandparent:1|parent:0|component:', where the
+        // integers represent $delta keys, and the components are represented by
+        // their form keys.
         foreach ($ancestors as $key => $ancestor) {
-          if ($key < $ancestors_count - 1) {
+          if ($key < $ancestors_count) {
             if ($key > 0) {
               $delta_prefix .= is_int($ancestor) ? ':' : '|';
             }
@@ -373,7 +374,7 @@ function wfm_submit($form, &$form_state) {
         }
         $value_prefixed = array();
         foreach ($value as $delta => $sub_value) {
-          $new_delta = $delta_prefix . '|' . $delta;
+          $new_delta = $delta_prefix . ':' . $delta;
           $value_prefixed[$new_delta] = $sub_value;
         }
         $value = $value_prefixed;
