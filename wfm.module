@@ -6,12 +6,13 @@
 
 /**
  * TODO
- * 1. Fix display for Date and Grid components.
- * 2. Remove unnecessary array expansion / nested value reading, perhaps.
- * 3. Support file components properly.
- * 4. Add support for tokens.
- * 5. Add support for conditionals.
- * 6. Correct for components that have been removed from their parents since
+ * 1. Fix undefined index error on re-saving submissions.
+ * 2. Fix display for Date and Grid components.
+ * 3. Remove unnecessary array expansion / nested value reading, perhaps.
+ * 4. Support file components properly.
+ * 5. Add support for tokens.
+ * 6. Add support for conditionals.
+ * 7. Correct for components that have been removed from their parents since
  *    submission.
  */
 
@@ -138,7 +139,6 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   $element_name = isset($element['#name']) ? $element['#name'] : "submitted[$form_key]";
   $element_parents = isset($element['#parents']) ? $element['#parents'] : array('submitted', $form_key);
   $element_wfm_parents = isset($element['#wfm_parents']) ? $element['#wfm_parents'] : array($cid);
-  $form_state['wfm_ancestors'][$cid][implode('.', $element_parents)] = $element_parents;
 
   // Get the current item count for this component.
   $new = FALSE;
@@ -238,8 +238,9 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
 
     // Get the default value of the item.
     $default_value = NULL;
-    if ($submission && $new && empty($component['children'])) {
+    if ($submission && empty($component['children'])) {
       $default_value = drupal_array_get_nested_value($submission->wfm_data, $wfm_parents);
+      $default_value = (array) $default_value;
     }
 
     // Generate any new form items needed. They are all added as children of the
@@ -260,8 +261,10 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
     // Process new and existing form items.
     $item = &$element[$delta];
     $item['#name'] = $element_name . "[$delta]";
-    $item['#parents'] = $wfm_parents;
+    $item['#parents'] = $element['#parents'];
+    $item['#parents'][] = $delta;
     $item['#wfm_parents'] = $wfm_parents;
+    $form_state['wfm_ancestors'][$cid][implode('.', $item['#parents'])] = $item['#parents'];
 
     // Add the item's children (e.g. if it's a fieldset).
     if (!empty($component['children'])) {
@@ -272,8 +275,9 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         array_unshift($sub_item_wfm_parents, $scid);
         if (!isset($item[$sub_component_key])) {
           $sub_item_value = NULL;
-          if ($display && $submission && $new) {
+          if ($submission) {
             $sub_item_value = drupal_array_get_nested_value($submission->wfm_data, $sub_item_wfm_parents, $scid);
+            $sub_item_value = (array) $sub_item_value;
           }
           $item[$sub_component_key] = _wfm_component_element_render($sub_component, $display, $sub_item_value, $format);
         }
@@ -285,12 +289,6 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         $form_state['wfm_ancestors'][$scid][implode('.', $sub_item['#parents'])] = $sub_item['#parents'];
         // Recursively process any multiple-value children.
         _wfm_process_elements($sub_item, $form_state, $submission, $display);
-      }
-    }
-    elseif ($default_value) {
-      $item['#default_value'] = $default_value;
-      if ($display) {
-        $item['#value'] = $default_value;
       }
     }
 
@@ -426,6 +424,8 @@ function wfm_submit($form, &$form_state) {
     foreach ($component_ancestors[$cid] as $ancestors) {
       // Remove 'submitted' from the ancestors array.
       array_shift($ancestors);
+
+      dpm(implode(',', $ancestors));
 
       // Get the component's value.
       $value = drupal_array_get_nested_value($form_state['values']['submitted'], $ancestors, $set);
