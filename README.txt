@@ -14,10 +14,6 @@ themselves, or if they are children of multiple-value fieldsets. In these cases
 the date information cannot be saved. A patch to the Date component is probably
 the only way forward.
 
-Multiple-value data is not displayed yet.
-
-Much is subject to change.
-
 
 Copyright
 ---------
