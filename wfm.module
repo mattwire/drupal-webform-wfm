@@ -94,11 +94,11 @@ function wfm_webform_submission_render_alter(&$renderable) {
   $node = $renderable['#node'];
   $submission = $renderable['#submission'];
   $format = $renderable['#format'];
-  if ($format == 'html') {
+  if ($format == 'html' || $format == 'text') {
     $form_state = array();
     foreach (element_children($renderable) as $form_key) {
       $element = &$renderable[$form_key];
-      _wfm_process_elements($element, $form_state, $submission, TRUE);
+      _wfm_process_elements($element, $form_state, $submission, TRUE, $format);
     }
   }
 }
@@ -138,7 +138,7 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
  * @param stdClass $submission
  *   The Webform submission object.
  */
-function _wfm_process_elements(&$element, &$form_state, $submission, $display = FALSE) {
+function _wfm_process_elements(&$element, &$form_state, $submission, $display = FALSE, $format = 'html') {
   $component = $element['#webform_component'];
   $form_key = $component['form_key'];
   $cid = $component['cid'];
@@ -239,10 +239,20 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
       $element['add_more']['#name'] .= $element_name . '_add_more_' . $delta;
     }
 
+    // Define the parents of the item.
+    $wfm_parents = $element['#wfm_parents'];
+    $wfm_parents[] = $delta;
+
+    // Get the default value of the item.
+    $default_value = NULL;
+    if ($submission && $new && empty($component['children'])) {
+      $default_value = drupal_array_get_nested_value($submission->wfm_data, $wfm_parents);
+    }
+
     // Generate any new form items needed. They are all added as children of the
     // parent $element, keyed by $delta.
     if (!isset($element[$delta])) {
-      $new_element = _wfm_component_element_render($component, $display);
+      $new_element = _wfm_component_element_render($component, $display, $default_value, $format);
       $new_element['#weight'] = $initial_weight + ($delta / 100);
       // Add wfm CSS classes to the element.
       if ($delta == $item_count - 1) {
@@ -257,10 +267,8 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
     // Process new and existing form items.
     $item = &$element[$delta];
     $item['#name'] = $element_name . "[$delta]";
-    $item['#parents'] = $element['#parents'];
-    $item['#parents'][] = $delta;
-    $item['#wfm_parents'] = $element['#wfm_parents'];
-    $item['#wfm_parents'][] = $delta;
+    $item['#parents'] = $wfm_parents;
+    $item['#wfm_parents'] = $wfm_parents;
 
     // Add the item's children (e.g. if it's a fieldset).
     if (!empty($component['children'])) {
@@ -271,10 +279,10 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         array_unshift($sub_item_wfm_parents, $scid);
         if (!isset($item[$sub_component_key])) {
           $sub_item_value = NULL;
-          if ($display) {
+          if ($display && $submission && $new) {
             $sub_item_value = drupal_array_get_nested_value($submission->wfm_data, $sub_item_wfm_parents, $scid);
           }
-          $item[$sub_component_key] = _wfm_component_element_render($sub_component, $display, $sub_item_value);
+          $item[$sub_component_key] = _wfm_component_element_render($sub_component, $display, $sub_item_value, $format);
         }
         $sub_item = &$item[$sub_component_key];
         $sub_item['#name'] = $item['#name'] . "[$sub_component_key]";
@@ -286,13 +294,10 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         _wfm_process_elements($sub_item, $form_state, $submission, $display);
       }
     }
-    elseif ($submission && $new) {
-      $default_value = drupal_array_get_nested_value($submission->wfm_data, $item['#wfm_parents'], $exists);
-      if ($exists) {
-        $item['#default_value'] = $default_value;
-        if ($display) {
-          $item['#value'] = $default_value;
-        }
+    elseif ($default_value) {
+      $item['#default_value'] = $default_value;
+      if ($display) {
+        $item['#value'] = $default_value;
       }
     }
 
@@ -509,6 +514,8 @@ function wfm_webform_submission_load(&$submissions) {
 
 /**
  * Convert submission data into a descriptive string.
+ *
+ * @todo make more human-readable
  */
 function _wfm_submission_data_to_string(array $data) {
   if (count($data) == 1 && isset($data[0])) {
@@ -580,25 +587,20 @@ function _wfm_filter_recursive($array) {
 /**
  * Helper function to render a repeatable Webform component as a form element.
  */
-function _wfm_component_element_render($component, $display = FALSE, $value = NULL) {
-  $elements = &drupal_static(__FUNCTION__, array());
-  $key = $component['cid'] . '_' . $display . '_' . implode('-', (array) $value);
-  if (!isset($elements[$key])) {
-    if ($display) {
-      $element = webform_component_invoke($component['type'], 'display', $component, $value, 'html');
-    }
-    else {
-      $element = webform_component_invoke($component['type'], 'render', $component);
-    }
-    $element['#webform_component'] = $component;
-    if (!isset($element['#attributes']['class'])) {
-      $element['#attributes']['class'] = array();
-    }
-    $element['#attributes']['class'][] = 'wfm';
-    drupal_alter(($display ? 'webform_component_display' : 'webform_component_render'), $element, $component);
-    $elements[$key] = $element;
+function _wfm_component_element_render($component, $display = FALSE, $value = NULL, $format = 'html') {
+  if ($display) {
+    $element = webform_component_invoke($component['type'], 'display', $component, $value, $format);
   }
-  return $elements[$key];
+  else {
+    $element = webform_component_invoke($component['type'], 'render', $component, $value);
+  }
+  $element['#webform_component'] = $component;
+  if (!isset($element['#attributes']['class'])) {
+    $element['#attributes']['class'] = array();
+  }
+  $element['#attributes']['class'][] = 'wfm';
+  drupal_alter(($display ? 'webform_component_display' : 'webform_component_render'), $element, $component);
+  return $element;
 }
 
 /**
