@@ -1,11 +1,28 @@
 /**
  * CSS for the Webform Multiple module.
  */
+
+/* Style the containers used to wrap multiple-value elements */
 .wfm-container {
   border: 1px dotted #ccc;
   border-radius: 5px;
   margin: 1em 0;
-  padding-left: 10px;
-  padding-right: 10px;
+  padding: 10px 10px 0;
   position: relative;
+}
+
+/* Show the 'Remove' button next to inline elements. */
+.wfm-container .webform-container-inline {
+  clear: left;
+  float: left;
+  margin-right: 10px;
+}
+.wfm-container .webform-container-inline + .wfm-remove.form-submit {
+  display: block;
+  float: left;
+}
+.wfm-container .webform-container-inline + .wfm-add.form-submit {
+  clear: left;
+  display: block;
+  float: none;
 }
