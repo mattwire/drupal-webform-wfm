@@ -126,7 +126,6 @@ function _wfm_process_elements(&$element, &$form_state, $submission) {
   $element_parents = isset($element['#parents']) ? $element['#parents'] : array('submitted', $form_key);
   $element_wfm_parents = isset($element['#wfm_parents']) ? $element['#wfm_parents'] : array($cid);
   $form_state['wfm_ancestors'][$cid][implode('.', $element_parents)] = $element_parents;
-  $element['#description'] = $element_name;
 
   // Get the current item count for this component.
   $new = FALSE;
