@@ -6,13 +6,12 @@
 
 /**
  * TODO
- * 1. Fix undefined index error on re-saving submissions.
- * 2. Fix display for Date and Grid components.
- * 3. Remove unnecessary array expansion / nested value reading, perhaps.
- * 4. Support file components properly.
- * 5. Add support for tokens.
- * 6. Add support for conditionals.
- * 7. Correct for components that have been removed from their parents since
+ * 1. Fix display for Date and Grid components.
+ * 2. Remove multiple unnecessary array expansion / nested value reading.
+ * 3. Support file components properly.
+ * 4. Add support for tokens.
+ * 5. Add support for conditionals.
+ * 6. Correct for components that have been removed from their parents since
  *    submission.
  */
 
@@ -139,6 +138,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   $element_name = isset($element['#name']) ? $element['#name'] : "submitted[$form_key]";
   $element_parents = isset($element['#parents']) ? $element['#parents'] : array('submitted', $form_key);
   $element_wfm_parents = isset($element['#wfm_parents']) ? $element['#wfm_parents'] : array($cid);
+  $form_state['wfm_ancestors'][$cid][implode('.', $element_parents)] = $element_parents;
 
   // Get the current item count for this component.
   $new = FALSE;
@@ -149,7 +149,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
     }
   }
 
-  // Stop processing if this component does not accept multiple values.
+  // Reduced processing if this component does not accept multiple values.
   if (!_wfm_is_multiple($component)) {
     if ($submission && $new) {
       $value = drupal_array_get_nested_value($submission->wfm_data, $element_wfm_parents, $exists);
@@ -203,7 +203,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   }
 
   if ($submission && $new) {
-    $element_value = drupal_array_get_nested_value($submission->wfm_data, $element['#wfm_parents'], $exists);
+    $element_value = drupal_array_get_nested_value($submission->wfm_data, $element_wfm_parents, $exists);
     if ($exists) {
       $element_deltas = array_keys($element_value);
       foreach ($element_deltas as $delta) {
@@ -264,7 +264,6 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
     $item['#parents'] = $element['#parents'];
     $item['#parents'][] = $delta;
     $item['#wfm_parents'] = $wfm_parents;
-    $form_state['wfm_ancestors'][$cid][implode('.', $item['#parents'])] = $item['#parents'];
 
     // Add the item's children (e.g. if it's a fieldset).
     if (!empty($component['children'])) {
@@ -286,7 +285,6 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         $sub_item['#parents'] = $item['#parents'];
         $sub_item['#parents'][] = $sub_component_key;
         $sub_item['#wfm_parents'] = $sub_item_wfm_parents;
-        $form_state['wfm_ancestors'][$scid][implode('.', $sub_item['#parents'])] = $sub_item['#parents'];
         // Recursively process any multiple-value children.
         _wfm_process_elements($sub_item, $form_state, $submission, $display);
       }
@@ -401,14 +399,23 @@ function wfm_submit($form, &$form_state) {
    *
    * The value in $value can be either scalar or a single-dimensional array.
    */
-  $component_ancestors = $form_state['wfm_ancestors'];
+  $component_ancestors = array();
+  if (isset($form_state['wfm_ancestors'])) {
+    $component_ancestors = $form_state['wfm_ancestors'];
+  }
   $values = array();
   // Go through all the non-group components, getting their values and
   // identifying where they should have extra identification added describing
   // the hierarchy of their parents.
   foreach ($components as $cid => $component) {
-    // Only act on components that were processed by Webform Multiple.
+
+    $form_key = $component['form_key'];
+
+    // Deal with components that were never processed by Webform Multiple.
     if (!isset($component_ancestors[$cid])) {
+      $parents = _wfm_get_parent_keys($component, $components);
+      $value = drupal_array_get_nested_value($form_state['values']['submitted'], $parents);
+      drupal_array_set_nested_value($values, $parents, $value);
       continue;
     }
 
@@ -424,8 +431,6 @@ function wfm_submit($form, &$form_state) {
     foreach ($component_ancestors[$cid] as $ancestors) {
       // Remove 'submitted' from the ancestors array.
       array_shift($ancestors);
-
-      dpm(implode(',', $ancestors));
 
       // Get the component's value.
       $value = drupal_array_get_nested_value($form_state['values']['submitted'], $ancestors, $set);
@@ -473,17 +478,19 @@ function wfm_submit($form, &$form_state) {
         $value = $value_prefixed;
       }
 
-      // Add each value to the $values array, with a similar structure but now
-      // with only string array keys, representing components' 'form keys'
-      // (removing the deltas).
+      // Add each value to the $form_state['valuess'] array, with a similar
+      // structure but now with only string array keys, representing components'
+      // 'form keys' (removing the deltas).
       $ancestors = array_filter($ancestors, 'is_string');
       foreach ($value as $key => $data) {
         $value_parents = $ancestors;
         $value_parents[] = $key;
         drupal_array_set_nested_value($values, $value_parents, $data, TRUE);
       }
+
     }
   }
+
   $form_state['values']['submitted'] = $values;
 
 }
@@ -494,13 +501,12 @@ function wfm_submit($form, &$form_state) {
 function wfm_webform_submission_load(&$submissions) {
   foreach ($submissions as $sid => $submission) {
     if (!isset($submission->wfm_data)) {
-      $original_data = $submission->data;
       $submission->wfm_data = array();
-      foreach ($original_data as $cid => $data) {
+      foreach ($submission->data as $cid => $data) {
         $submission->wfm_data[$cid] = _wfm_submission_data_expand($data);
-        $submission->data[$cid] = array(0 => _wfm_submission_data_to_string($data));
+        $submission->data[$cid] = (array) _wfm_submission_data_to_string($data);
       }
-      _wfm_submission_data_expand_parents($submission->wfm_data, $original_data);
+      _wfm_submission_data_expand_parents($submission->wfm_data, $submission->data);
     }
   }
 }
@@ -537,7 +543,7 @@ function _wfm_submission_data_to_string(array $data) {
 function _wfm_submission_data_expand(array $data) {
   $output = array();
   foreach ($data as $key => $value) {
-    if (strpos($key, '|') === FALSE) {
+    if (strpos($key, '|') === FALSE && strpos($key, '#') === FALSE) {
       $output[$key] = $value;
       continue;
     }
@@ -638,6 +644,19 @@ function _wfm_get_max_items(array $component) {
     $max_items = (int) $component['extra']['wfm_max_items'];
   }
   return $max_items;
+}
+
+/**
+ * Get the parent form keys of a component.
+ */
+function _wfm_get_parent_keys(array $component, $components) {
+  $keys = array();
+  if (!empty($component['pid'])) {
+    $parent_component = $components[$component['pid']];
+    $keys = array_merge($keys, _wfm_get_parent_keys($parent_component, $components));
+  }
+  $keys[] = $component['form_key'];
+  return $keys;
 }
 
 /**
