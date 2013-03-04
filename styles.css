@@ -6,16 +6,21 @@
 .wfm-container {
   border: 1px dotted #ccc;
   border-radius: 5px;
+  clear: left;
   margin: 1em 0;
   padding: 10px;
   position: relative;
 }
 
 /* Show the 'Remove' button next to inline elements. */
-.wfm-container .webform-container-inline {
+.wfm-container .webform-component {
   clear: left;
+}
+.wfm-container .webform-container-inline {
   float: left;
-  margin: 0.5em 10px 0.5em 0;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  margin-right: 10px;
   padding-top: 0; padding-bottom: 0;
 }
 .wfm-container .wfm-remove.form-submit {
