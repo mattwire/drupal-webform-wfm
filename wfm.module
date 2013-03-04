@@ -9,10 +9,9 @@
  * 1. Fix display for Date and Grid components.
  * 2. Remove unnecessary array expansion / nested value reading, perhaps.
  * 3. Support file components properly.
- * 4. Add support for emails.
- * 5. Add support for tokens.
- * 6. Check/add support for conditionals.
- * 7. Correct for components that have been removed from their parents since
+ * 4. Add support for tokens.
+ * 5. Add support for conditionals.
+ * 6. Correct for components that have been removed from their parents since
  *    submission.
  */
 
@@ -79,12 +78,6 @@ function wfm_webform_component_presave(&$component) {
   }
   $component['extra']['wfm_min_items'] = $min_items;
   $component['extra']['wfm_add_more_text'] = $component['wfm']['add_more_text'];
-}
-
-/**
- * Implements hook_webform_component_display_alter().
- */
-function wfm_webform_component_display_alter(&$element, &$component) {
 }
 
 /**
@@ -516,7 +509,17 @@ function _wfm_submission_data_to_string(array $data) {
   }
   $output = '';
   foreach ($data as $key => $value) {
-    $output .= $key . ': ' . $value . "\n\n";
+    if (preg_match_all('/#([0-9]+)/', $key, $deltas)) {
+      $deltas = $deltas[1];
+      foreach ($deltas as &$delta) {
+        $delta++;
+      }
+      $output .= implode('>', $deltas) . ': ';
+    }
+    else {
+      $output .= $key + 1 . ': ';
+    }
+    $output .= $value . "\n\n";
   }
   return $output;
 }
