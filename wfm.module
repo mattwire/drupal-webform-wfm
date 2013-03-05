@@ -160,7 +160,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
       $sub_element['#parents'][] = $key;
       $sub_element['#wfm_parents'] = $element_wfm_parents;
       $sub_element['#wfm_parents'][] = $scid;
-      //array_unshift($sub_element['#wfm_parents'], $scid);
+      array_unshift($sub_element['#wfm_parents'], $scid);
       _wfm_process_elements($element[$key], $form_state, $submission, $display, $format);
     }
     return;
@@ -170,8 +170,11 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   $max_items = _wfm_get_max_items($component);
   $min_items = _wfm_get_min_items($component);
   if (!isset($form_state['wfm_deltas'][$element_name])) {
+    for ($i = 0; $i < $min_items; $i++) {
+      $form_state['wfm_deltas'][$element_name][$i] = $i;
+    }
     if ($submission) {
-      if (isset($submission->wfm_data[$cid])) {
+      if (!empty($component['children']) && isset($submission->wfm_data[$cid])) {
         $element_value = $submission->wfm_data[$cid];
       }
       else {
@@ -184,11 +187,6 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
             $form_state['wfm_deltas'][$element_name][$delta] = $delta;
           }
         }
-      }
-    }
-    else {
-      for ($i = 0; $i < $min_items; $i++) {
-        $form_state['wfm_deltas'][$element_name][$i] = $i;
       }
     }
   }
@@ -280,13 +278,11 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         $sub_component_key = $sub_component['form_key'];
         $sub_item_wfm_parents = $item['#wfm_parents'];
         $sub_item_wfm_parents[] = $scid;
-        //array_unshift($sub_item_wfm_parents, $scid);
+        array_unshift($sub_item_wfm_parents, $scid);
         if (!isset($item[$sub_component_key])) {
           $sub_item_value = NULL;
-          if ($submission) {
-            $search_parents = $sub_item_wfm_parents;
-            array_unshift($search_parents, $scid);
-            $sub_item_value = drupal_array_get_nested_value($submission->wfm_data, $search_parents, $exists);
+          if ($submission && !_wfm_is_multiple($sub_component)) {
+            $sub_item_value = drupal_array_get_nested_value($submission->wfm_data, $sub_item_wfm_parents, $exists);
             if ($exists) {
               $sub_item_value = (array) $sub_item_value;
             }
