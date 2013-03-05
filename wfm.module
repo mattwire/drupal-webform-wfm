@@ -140,6 +140,8 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   $element_parents = isset($element['#parents']) ? $element['#parents'] : array('submitted', $form_key);
   $element_wfm_parents = isset($element['#wfm_parents']) ? $element['#wfm_parents'] : array($cid);
 
+  $initial_weight = isset($element['#weight']) ? $element['#weight'] : 1;
+
   $form_state['wfm_ancestors'][$cid][implode('.', $element_parents)] = $element_parents;
 
   // Stop processing if this component does not accept multiple values.
@@ -150,39 +152,42 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
       if (!isset($sub_element['#webform_component'])) {
         continue;
       }
+      $sub_component = $sub_element['#webform_component'];
       $scid = $sub_element['#webform_component']['cid'];
       $sub_element['#name'] = $element_name . "[$key]";
       $sub_element['#parents'] = $element_parents;
       $sub_element['#parents'][] = $key;
       $sub_element['#wfm_parents'] = $element_wfm_parents;
       $sub_element['#wfm_parents'][] = $scid;
-      array_unshift($sub_element['#wfm_parents'], $scid);
+      //array_unshift($sub_element['#wfm_parents'], $scid);
       _wfm_process_elements($element[$key], $form_state, $submission, $display, $format);
     }
     return;
   }
 
   // Get the current item count for this component.
-  $new = FALSE;
-  if (!isset($form_state['wfm_deltas'][$element_name])) {
-    $new = TRUE;
-    for ($i = 0; $i < _wfm_get_min_items($component); $i++) {
-      $form_state['wfm_deltas'][$element_name][$i] = $i;
-    }
-  }
-
   $max_items = _wfm_get_max_items($component);
   $min_items = _wfm_get_min_items($component);
-  $initial_weight = isset($element['#weight']) ? $element['#weight'] : 1;
-
-  if ($submission && $new) {
-    $element_value = drupal_array_get_nested_value($submission->wfm_data, $element_wfm_parents, $exists);
-    if ($exists) {
-      $element_deltas = array_keys($element_value);
-      foreach ($element_deltas as $delta) {
-        if (!isset($form_state['wfm_deltas'][$element_name][$delta])) {
-          $form_state['wfm_deltas'][$element_name][$delta] = $delta;
+  if (!isset($form_state['wfm_deltas'][$element_name])) {
+    if ($submission) {
+      if (isset($submission->wfm_data[$cid])) {
+        $element_value = $submission->wfm_data[$cid];
+      }
+      else {
+        $element_value = drupal_array_get_nested_value($submission->wfm_data, $element_wfm_parents);
+      }
+      if (is_array($element_value)) {
+        $element_deltas = array_keys($element_value);
+        foreach ($element_deltas as $delta) {
+          if (!isset($form_state['wfm_deltas'][$element_name][$delta])) {
+            $form_state['wfm_deltas'][$element_name][$delta] = $delta;
+          }
         }
+      }
+    }
+    else {
+      for ($i = 0; $i < $min_items; $i++) {
+        $form_state['wfm_deltas'][$element_name][$i] = $i;
       }
     }
   }
@@ -476,7 +481,11 @@ function wfm_submit($form, &$form_state) {
       // Remove deltas from parents of this value.
       $value_parents = array_filter($ancestors, 'is_string');
       if ($value_parents != $ancestors) {
-        drupal_array_set_nested_value($form_state['values']['submitted'], $value_parents, $value, TRUE);
+        foreach ($value as $key => $sub_value) {
+          $sub_value_parents = $value_parents;
+          $sub_value_parents[] = $key;
+          drupal_array_set_nested_value($form_state['values']['submitted'], $sub_value_parents, $sub_value, TRUE);
+        }
         $value = NULL;
       }
 
