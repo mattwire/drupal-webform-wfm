@@ -118,9 +118,15 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
       _wfm_process_elements($form['submitted'][$form_key], $form_state, $submission);
     }
   }
+
+  // Add WFM's validation handler, to replace Webform's own.
+  $key = array_search('webform_client_form_validate', $form['#validate']);
+  unset($form['#validate'][$key]);
+  $form['#validate'][] = 'wfm_validate';
+
+  // Add the WFM submit handler to be called before any other submit handlers.
   array_unshift($form['#submit'], 'wfm_submit');
 }
-
 
 /**
  * Process an element in the Webform to allow multiple values.
@@ -383,32 +389,82 @@ function wfm_submit($form, &$form_state) {
     $form_state['values']['submitted'] = array();
   }
 
-  // Remove all non-component values, except 'details' and 'op' which are needed
-  // by webform_client_form_pages().
-  $details = $form_state['values']['details'];
-  $op = $form_state['values']['op'];
-  form_state_values_clean($form_state);
-  $form_state['values']['details'] = $details;
-  $form_state['values']['op'] = $op;
-
-  // Build a list of component IDs keyed by their 'form_key' string properties.
   $node = $form['#node'];
   $components = $node->webform['components'];
+
+  _wfm_values_prepare($form_state, $components);
+
+}
+
+/**
+ * Validation callback for the webform, running before Webform callbacks.
+ */
+function wfm_validate($form, &$form_state) {
+  $node = $form['#node'];
+  $components = $node->webform['components'];
+
+  // Bypass validation if #limit_validation_errors is an empty array.
+  if (isset($form_state['triggering_element']['#limit_validation_errors']) && !count($form_state['triggering_element']['#limit_validation_errors'])) {
+    return;
+  }
+
+  // Prepare the $form_state so it can be processed by the Webform validator.
+  // But save the values in their original form because they will be needed
+  // later.
+  $original_submitted = $form_state['values']['submitted'];
+  _wfm_values_prepare($form_state, $components);
+
+  // Run the Webform validator.
+  webform_client_form_validate($form, $form_state);
+
+  // Reset the $form_state values after Webform has finished with it. It needs
+  // to stay intact for rebuilding the form.
+  $form_state['values']['submitted'] = $original_submitted;
+
+}
+
+/**
+ * Sanitize the $form_state so that it can be processed by Webform.
+ *
+ * In $form_state['submitted']['values'], Webform expects to get an array like:
+ * @code
+ *   array($parent_key => array($component_key => $value))
+ * @endcode
+ * for every component.
+ *
+ * The value in $value above can be either scalar or a single-dimensional array.
+ */
+function _wfm_values_prepare(&$form_state, $components) {
+
+  // Cache the prepared values, because this function can be called several
+  // times in one request for each form (during validation and submission).
+  static $prepared = array();
+
+  $build_id = $form_state['complete form']['#build_id'];
+
+  if (isset($prepared[$build_id])) {
+    $form_state = $prepared[$build_id];
+    return;
+  }
+
+  // Remove all non-component values, except 'details' and 'op' because they are
+  // needed later by webform_client_form_pages()
+  $details = $form_state['values']['details'];
+  if (isset($form_state['values']['op'])) {
+    $op = $form_state['values']['op'];
+  }
+  form_state_values_clean($form_state);
+  $form_state['values']['details'] = $details;
+  if (isset($op)) {
+    $form_state['values']['op'] = $op;
+  }
+
+  // Build a list of component IDs keyed by their 'form_key' string properties.
   $cids_by_key = array();
   foreach ($components as $cid => $component) {
     $cids_by_key[$component['form_key']] = $cid;
   }
 
-  /*
-   * Flatten the $form_state['values']['submitted'] array in such a way that it
-   * can be further processed by Webform.
-   *
-   * Webform expects to get an array like:
-   *   array($parent_key => array($component_key => $value))
-   * for every component.
-   *
-   * The value in $value can be either scalar or a single-dimensional array.
-   */
   $component_ancestors = $form_state['wfm_ancestors'];
   // Go through all the non-group components, getting their values and
   // identifying where they should have extra identification added describing
@@ -496,6 +552,11 @@ function wfm_submit($form, &$form_state) {
 
   }
 
+  // Remove empty arrays from $form_state.
+  $form_state['values']['submitted'] = _wfm_filter_recursive($form_state['values']['submitted']);
+
+  $prepared[$build_id] = $form_state;
+
 }
 
 /**
@@ -579,20 +640,25 @@ function _wfm_submission_data_expand_parents(&$wfm_data, $data) {
 }
 
 /**
- * Filter an array recursively.
+ * Filter an array to remove any values that are empty.
  *
- * If all of the array's values are '' or NULL return NULL.
+ * Recurse to remove arrays whose elements are all empty.
+ *
+ * An element is considered empty if its value is '' or NULL.
  */
 function _wfm_filter_recursive($array) {
   if (!is_array($array)) {
     return $array;
   }
   $filled = FALSE;
-  foreach ($array as &$value) {
+  foreach ($array as $key => &$value) {
     if (is_array($value)) {
       $value = _wfm_filter_recursive($value);
     }
-    if (is_array($value) || ($value !== '' && $value !== NULL)) {
+    if (!is_array($value) && ($value === '' || $value === NULL)) {
+      unset($array[$key]);
+    }
+    else {
       $filled = TRUE;
     }
   }
@@ -603,18 +669,29 @@ function _wfm_filter_recursive($array) {
  * Helper function to render a repeatable Webform component as a form element.
  */
 function _wfm_component_element_render($component, $display = FALSE, $value = NULL, $format = 'html') {
+
+  $static_cache = &drupal_static(__FUNCTION__, array());
+  $key = $component['cid'] . "_$format";
+  if (isset($static_cache[$key]) && $value === NULL) {
+    return $static_cache[$key];
+  }
+
   if ($display) {
     $element = webform_component_invoke($component['type'], 'display', $component, $value, $format);
   }
   else {
     $element = webform_component_invoke($component['type'], 'render', $component, $value);
   }
+
   $element['#webform_component'] = $component;
-  if (!isset($element['#attributes']['class'])) {
-    $element['#attributes']['class'] = array();
-  }
   $element['#attributes']['class'][] = 'wfm';
+
   drupal_alter(($display ? 'webform_component_display' : 'webform_component_render'), $element, $component);
+
+  if ($value === NULL) {
+    $static_cache[$key] = $element;
+  }
+
   return $element;
 }
 
