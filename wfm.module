@@ -6,12 +6,13 @@
 
 /**
  * TODO
- * 1. Fix display for Date and Grid components.
- * 2. Remove multiple unnecessary array expansion / nested value reading.
- * 3. Support file components properly.
- * 4. Add support for tokens.
- * 5. Add support for conditionals.
- * 6. Correct for components that have been removed from their parents since
+ * 1. Fix display for Date components.
+ * 2. Fix saving data inside multiple-value fieldsets for Select components.
+ * 3. Remove multiple unnecessary array expansion / nested value reading.
+ * 4. Support file components properly.
+ * 5. Add support for tokens.
+ * 6. Add support for conditionals.
+ * 7. Correct for components that have been removed from their parents since
  *    submission.
  */
 
@@ -279,12 +280,16 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         $sub_component_key = $sub_component['form_key'];
         $sub_item_wfm_parents = $item['#wfm_parents'];
         $sub_item_wfm_parents[] = $scid;
-        array_unshift($sub_item_wfm_parents, $scid);
+        //array_unshift($sub_item_wfm_parents, $scid);
         if (!isset($item[$sub_component_key])) {
           $sub_item_value = NULL;
           if ($submission) {
-            $sub_item_value = drupal_array_get_nested_value($submission->wfm_data, $sub_item_wfm_parents, $scid);
-            $sub_item_value = (array) $sub_item_value;
+            $search_parents = $sub_item_wfm_parents;
+            array_unshift($search_parents, $scid);
+            $sub_item_value = drupal_array_get_nested_value($submission->wfm_data, $search_parents, $exists);
+            if ($exists) {
+              $sub_item_value = (array) $sub_item_value;
+            }
           }
           $item[$sub_component_key] = _wfm_component_element_render($sub_component, $display, $sub_item_value, $format);
         }
@@ -433,10 +438,13 @@ function wfm_submit($form, &$form_state) {
       array_shift($ancestors);
 
       // Get the component's value.
-      $value = &drupal_array_get_nested_value($form_state['values']['submitted'], $ancestors, $set);
+      $value = drupal_array_get_nested_value($form_state['values']['submitted'], $ancestors, $set);
       if (!$set) {
         continue;
       }
+
+      // Take the value out of $form_state.
+      _wfm_array_unset_nested_value($form_state['values']['submitted'], $ancestors);
 
       // Recursively check if the value is empty (equivalent to 0), and if so
       // stop processing.
@@ -480,13 +488,12 @@ function wfm_submit($form, &$form_state) {
 
       // Remove deltas from parents of this value.
       $value_parents = array_filter($ancestors, 'is_string');
-      if ($value_parents != $ancestors) {
-        foreach ($value as $key => $sub_value) {
-          $sub_value_parents = $value_parents;
-          $sub_value_parents[] = $key;
-          drupal_array_set_nested_value($form_state['values']['submitted'], $sub_value_parents, $sub_value, TRUE);
-        }
-        $value = NULL;
+
+      // Set the value again in $form_state.
+      foreach ($value as $key => $sub_value) {
+        $sub_value_parents = $value_parents;
+        $sub_value_parents[] = $key;
+        drupal_array_set_nested_value($form_state['values']['submitted'], $sub_value_parents, $sub_value, TRUE);
       }
 
     }
@@ -533,7 +540,7 @@ function _wfm_submission_data_to_string(array $data) {
     else {
       $output .= $key + 1 . ': ';
     }
-    $output .= $value . "\n\n";
+    $output .= $value . "; ";
   }
   return $output;
 }
@@ -684,6 +691,21 @@ function _wfm_get_min_items(array $component) {
     $min_items = (int) $component['extra']['wfm_min_items'];
   }
   return $min_items;
+}
+
+/**
+ * Unset a nested value in an array.
+ */
+function _wfm_array_unset_nested_value(array &$array, array $parents, &$key_existed = NULL) {
+  $unset_key = array_pop($parents);
+  $ref = &drupal_array_get_nested_value($array, $parents, $key_existed);
+  if ($key_existed && is_array($ref) && array_key_exists($unset_key, $ref)) {
+    $key_existed = TRUE;
+    unset($ref[$unset_key]);
+  }
+  else {
+    $key_existed = FALSE;
+  }
 }
 
 /**
