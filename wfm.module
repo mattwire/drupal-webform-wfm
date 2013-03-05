@@ -278,7 +278,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         $sub_component_key = $sub_component['form_key'];
         $sub_item_wfm_parents = $item['#wfm_parents'];
         $sub_item_wfm_parents[] = $scid;
-        $sub_item_wfm_parents[0] = $scid;
+        array_unshift($sub_item_wfm_parents, $scid);
         if (!isset($item[$sub_component_key])) {
           $sub_item_value = NULL;
           if ($submission && !_wfm_is_multiple($sub_component)) {
