@@ -600,12 +600,12 @@ function wfm_webform_submission_load(&$submissions) {
 
 /**
  * Convert submission data into a descriptive string.
- *
- * @todo make more human-readable
  */
 function _wfm_submission_data_to_string(array $data) {
-  if (count($data) == 1 && isset($data[0])) {
-    return $data[0];
+  // Don't process this if all the keys are integers.
+  $data_keys = array_keys($data);
+  if ($data_keys == array_filter($data_keys, 'is_int')) {
+    return $data;
   }
   $output = '';
   foreach ($data as $key => $value) {
@@ -619,7 +619,7 @@ function _wfm_submission_data_to_string(array $data) {
     else {
       $output .= $key + 1 . ': ';
     }
-    $output .= $value . "; ";
+    $output .= $value . "\n\n";
   }
   return $output;
 }
