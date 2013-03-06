@@ -6,13 +6,14 @@
 
 /**
  * TODO
- * 1. Fix display for Date components.
- * 2. Fix saving data inside multiple-value fieldsets for Select components.
- * 3. Remove multiple unnecessary array expansion / nested value reading.
- * 4. Support file components properly.
- * 5. Add support for tokens.
- * 6. Add support for conditionals.
- * 7. Correct for components that have been removed from their parents since
+ * 1. Prevent removed deltas from remaining in the database.
+ * 2. Fix display for Date components.
+ * 3. Fix saving data inside multiple-value fieldsets for Select components.
+ * 4. Remove multiple unnecessary array expansion / nested value reading.
+ * 5. Support file components properly.
+ * 6. Add support for tokens.
+ * 7. Add support for conditionals.
+ * 8. Correct for components that have been removed from their parents since
  *    submission.
  */
 
@@ -177,29 +178,45 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   // Get the current item count for this component.
   $max_items = _wfm_get_max_items($component);
   $min_items = _wfm_get_min_items($component);
+
+  // The $delta keys for each component are saved in $form_state so they can be
+  // modified by the add/remove callbacks.
+  $new = FALSE;
   if (!isset($form_state['wfm_deltas'][$element_name])) {
-    for ($i = 0; $i < $min_items; $i++) {
-      $form_state['wfm_deltas'][$element_name][$i] = $i;
+    $new = TRUE;
+    $form_state['wfm_deltas'][$element_name] = array();
+  }
+
+  $element_deltas = &$form_state['wfm_deltas'][$element_name];
+
+  // Get the value and the item count from the submission, if there is one, and
+  // if $form_state was not already populated.
+  if ($submission && $new) {
+    if (isset($submission->wfm_data[$cid]) && !empty($component['children'])) {
+      $element_value = array_keys($submission->wfm_data[$cid]);
     }
-    if ($submission) {
-      if (!empty($component['children']) && isset($submission->wfm_data[$cid])) {
-        $element_value = $submission->wfm_data[$cid];
-      }
-      else {
-        $element_value = drupal_array_get_nested_value($submission->wfm_data, $element_wfm_parents);
-      }
-      if (is_array($element_value)) {
-        $element_deltas = array_keys($element_value);
-        foreach ($element_deltas as $delta) {
-          if (!isset($form_state['wfm_deltas'][$element_name][$delta])) {
-            $form_state['wfm_deltas'][$element_name][$delta] = $delta;
-          }
-        }
+    else {
+      $element_value = drupal_array_get_nested_value($submission->wfm_data, $element_wfm_parents);
+    }
+    if (is_array($element_value)) {
+      $deltas = array_keys($element_value);
+      foreach ($deltas as $delta) {
+        $element_deltas[$delta] = $delta;
       }
     }
   }
 
-  $item_count = count($form_state['wfm_deltas'][$element_name]);
+  // Pad the $delta keys if there aren't enough.
+  $missing = $min_items - count($element_deltas);
+  if ($missing > 0) {
+    $last_delta = empty($element_deltas) ? -1 : max(array_keys($element_deltas));
+    for ($i = 1; $i <= $missing; $i++) {
+      $next_delta = $last_delta + $i;
+      $element_deltas[$next_delta] = $next_delta;
+    }
+  }
+
+  $item_count = count($element_deltas);
 
   // Replace the element with a parent container.
   if (!isset($element['#wfm_wrapper'])) {
@@ -234,7 +251,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   }
 
   $item_number = 1;
-  foreach ($form_state['wfm_deltas'][$element_name] as $delta) {
+  foreach ($element_deltas as $delta) {
 
     // Remove the 'Add another item' button where appropriate.
     $final = ($item_count == $max_items);
@@ -253,7 +270,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
 
     // Get the default value of the item.
     $default_value = NULL;
-    if ($submission && empty($component['children'])) {
+    if (!empty($element_value) && empty($component['children'])) {
       $default_value = drupal_array_get_nested_value($submission->wfm_data, $wfm_parents);
       $default_value = (array) $default_value;
     }
@@ -262,7 +279,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
     // parent $element, keyed by $delta.
     if (!isset($element[$delta])) {
       $new_element = _wfm_component_element_render($component, $display, $default_value, $format);
-      $new_element['#weight'] = $initial_weight + ($delta / 100);
+      $new_element['#weight'] = $initial_weight + ($item_number / 100);
       // Add wfm CSS classes to the element.
       if ($delta == $item_count - 1) {
         $new_element['#attributes']['class'][] = 'wfm-last';
@@ -350,11 +367,12 @@ function wfm_add_more_submit(&$form, &$form_state) {
   $element = &drupal_array_get_nested_value($form, array_slice($button['#array_parents'], 0, -1));
   $component = $element['#webform_component'];
   $element_name = $element['#name'];
-  $item_count = count($form_state['wfm_deltas'][$element_name]);
-  $next_delta = end($form_state['wfm_deltas'][$element_name]) + 1;
+  $element_deltas = &$form_state['wfm_deltas'][$element_name];
+  $item_count = count($element_deltas);
+  $next_delta = max(array_keys($element_deltas)) + 1;
   $max_items = _wfm_get_max_items($component);
   if ($max_items == WFM_UNLIMITED || $item_count < $max_items) {
-    $form_state['wfm_deltas'][$element_name][$next_delta] = $next_delta;
+    $element_deltas[$next_delta] = $next_delta;
   }
   $form_state['rebuild'] = TRUE;
 }
