@@ -24,7 +24,7 @@ define('WFM_UNLIMITED', -1);
  */
 function wfm_form_webform_component_edit_form_alter(&$form, &$form_state) {
   $component = $form_state['build_info']['args'][1];
-  if (!in_array($component['type'], _wfm_supported_components())) {
+  if (!in_array($component['type'], _wfm_compatible_components())) {
     return;
   }
   $form['wfm'] = array(
@@ -89,7 +89,10 @@ function wfm_webform_submission_render_alter(&$renderable) {
   $node = $renderable['#node'];
   $submission = $renderable['#submission'];
   $format = $renderable['#format'];
+  // Process the child elements of the $renderable render array in the same way
+  // that the form elements were processed for the client form.
   if ($format == 'html' || $format == 'text') {
+    // Pass in a dummy $form_state array.
     $form_state = array();
     foreach (element_children($renderable) as $form_key) {
       $element = &$renderable[$form_key];
@@ -126,7 +129,8 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
   $form['#validate'][] = 'wfm_validate';
 
   // Add the WFM submit handler to be called before any other submit handlers.
-  array_unshift($form['#submit'], 'wfm_submit');
+  array_unshift($form['#submit'], 'wfm_submit_early');
+
 }
 
 /**
@@ -278,7 +282,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
     // Generate any new form items needed. They are all added as children of the
     // parent $element, keyed by $delta.
     if (!isset($element[$delta])) {
-      $new_element = _wfm_component_element_render($component, $display, $default_value, $format);
+      $new_element = _wfm_component_generate($component, $display, $default_value, $format);
       $new_element['#weight'] = $initial_weight + ($item_number / 100);
       // Add wfm CSS classes to the element.
       if ($delta == $item_count - 1) {
@@ -314,7 +318,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
               $sub_item_value = (array) $sub_item_value;
             }
           }
-          $item[$sub_component_key] = _wfm_component_element_render($sub_component, $display, $sub_item_value, $format);
+          $item[$sub_component_key] = _wfm_component_generate($sub_component, $display, $sub_item_value, $format);
         }
         $sub_item = &$item[$sub_component_key];
         $sub_item['#name'] = $item['#name'] . "[$sub_component_key]";
@@ -404,7 +408,7 @@ function wfm_js($form, $form_state) {
 /**
  * Submit callback for the webform, running before Webform callbacks.
  */
-function wfm_submit($form, &$form_state) {
+function wfm_submit_early($form, &$form_state) {
 
   // Multistep forms might not have any components on the first page.
   if (!isset($form_state['values']['submitted'])) {
@@ -414,7 +418,10 @@ function wfm_submit($form, &$form_state) {
   $node = $form['#node'];
   $components = $node->webform['components'];
 
+   // Prepare the submission values so that Webform can process them.
   _wfm_values_prepare($form_state, $components);
+
+  $form_state['rebuild'] = TRUE;
 
 }
 
@@ -586,6 +593,7 @@ function _wfm_values_prepare(&$form_state, $components) {
  */
 function wfm_webform_submission_load(&$submissions) {
   foreach ($submissions as $sid => $submission) {
+    // Expand submission data.
     if (!isset($submission->wfm_data)) {
       $original_data = $submission->data;
       $submission->wfm_data = array();
@@ -688,9 +696,9 @@ function _wfm_filter_recursive($array) {
 }
 
 /**
- * Helper function to render a repeatable Webform component as a form element.
+ * Helper function to produce a render array for a repeatable Webform component.
  */
-function _wfm_component_element_render($component, $display = FALSE, $value = NULL, $format = 'html') {
+function _wfm_component_generate($component, $display = FALSE, $value = NULL, $format = 'html') {
 
   $static_cache = &drupal_static(__FUNCTION__, array());
   $key = $component['cid'] . "_$format";
@@ -804,17 +812,18 @@ function _wfm_array_unset_nested_value(array &$array, array $parents, &$key_exis
 }
 
 /**
- * Get a list of the components supported by this module.
+ * Get a list of the components compatible with this module.
  */
-function _wfm_supported_components() {
-  return array(
+function _wfm_compatible_components() {
+  $types = array(
     'email',
     'fieldset',
-    'file',
     'name',
     'number',
     'textarea',
     'textfield',
     'time',
   );
+  drupal_alter('wfm_compatible_components', $types);
+  return $types;
 }
