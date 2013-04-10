@@ -593,13 +593,19 @@ function _wfm_values_prepare(&$form_state, $components) {
  */
 function wfm_webform_submission_load(&$submissions) {
   foreach ($submissions as $sid => $submission) {
-    // Expand submission data.
+    // Expand the submission's data into a multidimensional array stored in a
+    // new property, $submission->wfm_data.
     if (!isset($submission->wfm_data)) {
+      $node = node_load($submission->nid);
+      $components = $node->webform['components'];
       $original_data = $submission->data;
       $submission->wfm_data = array();
       foreach ($submission->data as $cid => $data) {
+        $component = $components[$cid];
         $submission->wfm_data[$cid] = _wfm_submission_data_expand($data);
-        $submission->data[$cid] = (array) _wfm_submission_data_to_string($data);
+        if (_wfm_is_multiple_recursive($component, $components)) {
+          $submission->data[$cid] = (array) _wfm_submission_data_to_string($data);
+        }
       }
       _wfm_submission_data_expand_parents($submission->wfm_data, $original_data);
     }
@@ -610,11 +616,9 @@ function wfm_webform_submission_load(&$submissions) {
  * Convert submission data into a descriptive string.
  */
 function _wfm_submission_data_to_string(array $data) {
-  // Don't process this if all the keys are integers.
-  $data_keys = array_keys($data);
-  if ($data_keys == array_filter($data_keys, 'is_int')) {
-    return $data;
-  }
+  // Go through each value (as loaded from the database), and find a prefix
+  // consisting of the item number ($delta + 1), potentially preceded by the
+  // item numbers of its ancestors separated by > (a bit like a breadcrumb).
   $output = '';
   foreach ($data as $key => $value) {
     if (preg_match_all('/#([0-9]+)/', $key, $deltas)) {
@@ -622,12 +626,12 @@ function _wfm_submission_data_to_string(array $data) {
       foreach ($deltas as &$delta) {
         $delta++;
       }
-      $output .= implode('>', $deltas) . ': ';
+      $prefix = implode('>', $deltas);
     }
     else {
-      $output .= $key + 1 . ': ';
+      $prefix = $key + 1;
     }
-    $output .= $value . "\n\n";
+    $output .= $prefix . ': ' . $value . "\n\n";
   }
   return $output;
 }
