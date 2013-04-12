@@ -4,19 +4,6 @@
  * Main module file for Webform Multiple (WFM).
  */
 
-/**
- * TODO
- * 1. Prevent removed deltas from remaining in the database.
- * 2. Fix display for Date components.
- * 3. Fix saving data inside multiple-value fieldsets for Select components.
- * 4. Remove multiple unnecessary array expansion / nested value reading.
- * 5. Support file components properly.
- * 6. Add support for tokens.
- * 7. Add support for conditionals.
- * 8. Correct for components that have been removed from their parents since
- *    submission.
- */
-
 define('WFM_UNLIMITED', -1);
 
 /**
