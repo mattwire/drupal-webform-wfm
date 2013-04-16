@@ -115,9 +115,6 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
   unset($form['#validate'][$key]);
   $form['#validate'][] = 'wfm_validate';
 
-  // Add the WFM submit handler to be called before any other submit handlers.
-  array_unshift($form['#submit'], 'wfm_submit_early');
-
 }
 
 /**
@@ -393,26 +390,6 @@ function wfm_js($form, $form_state) {
 }
 
 /**
- * Submit callback for the webform, running before Webform callbacks.
- */
-function wfm_submit_early($form, &$form_state) {
-
-  // Multistep forms might not have any components on the first page.
-  if (!isset($form_state['values']['submitted'])) {
-    $form_state['values']['submitted'] = array();
-  }
-
-  $node = $form['#node'];
-  $components = $node->webform['components'];
-
-   // Prepare the submission values so that Webform can process them.
-  _wfm_values_prepare($form_state, $components);
-
-  $form_state['rebuild'] = TRUE;
-
-}
-
-/**
  * Validation callback for the webform, running before Webform callbacks.
  */
 function wfm_validate($form, &$form_state) {
@@ -424,8 +401,8 @@ function wfm_validate($form, &$form_state) {
     return;
   }
 
-  // Prepare the $form_state so it can be processed by the Webform validator.
-  // But save the values in their original form because they will be needed
+  // Prepare the $form_state so it can be processed by the Webform validator,
+  // and save the values in their original form because they may be needed
   // later.
   $original_submitted = $form_state['values']['submitted'];
   _wfm_values_prepare($form_state, $components);
@@ -433,9 +410,12 @@ function wfm_validate($form, &$form_state) {
   // Run the Webform validator.
   webform_client_form_validate($form, $form_state);
 
-  // Reset the $form_state values after Webform has finished with it. It needs
-  // to stay intact for rebuilding the form.
-  $form_state['values']['submitted'] = $original_submitted;
+  // If the form needs to be rebuilt, reset the $form_state value array after
+  // Webform has finished with it. It needs to stay intact for rebuilding the
+  // form.
+  if (form_get_errors() || !empty($form_state['rebuild'])) {
+    $form_state['values']['submitted'] = $original_submitted;
+  }
 
 }
 
@@ -451,17 +431,6 @@ function wfm_validate($form, &$form_state) {
  * The value in $value above can be either scalar or a single-dimensional array.
  */
 function _wfm_values_prepare(&$form_state, $components) {
-
-  // Cache the prepared values, because this function can be called several
-  // times in one request for each form (during validation and submission).
-  static $prepared = array();
-
-  $build_id = $form_state['complete form']['#build_id'];
-
-  if (isset($prepared[$build_id])) {
-    $form_state = $prepared[$build_id];
-    return;
-  }
 
   // Remove all non-component values, except 'details' and 'op' because they are
   // needed later by webform_client_form_pages()
@@ -570,8 +539,6 @@ function _wfm_values_prepare(&$form_state, $components) {
 
   // Remove empty arrays from $form_state.
   $form_state['values']['submitted'] = _wfm_filter_recursive($form_state['values']['submitted']);
-
-  $prepared[$build_id] = $form_state;
 
 }
 
