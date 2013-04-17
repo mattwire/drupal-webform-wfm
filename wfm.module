@@ -413,9 +413,9 @@ function wfm_validate($form, &$form_state) {
   // Run the Webform validator.
   webform_client_form_validate($form, $form_state);
 
-  // If the form needs to be rebuilt, reset the $form_state value array after
-  // Webform has finished with it. It needs to stay intact for rebuilding the
-  // form.
+  // If the form needs to be rebuilt, for example if there were validation
+  // errors, then reset the $form_state array to its original structure (the
+  // structure it had before _wfm_values_prepare() was run).
   if (form_get_errors() || !empty($form_state['rebuild'])) {
     $form_state['values']['submitted'] = $original_submitted;
   }
