@@ -672,6 +672,12 @@ function _wfm_component_generate($component, $display = FALSE, $value = NULL, $f
   }
   else {
     $element = webform_component_invoke($component['type'], 'render', $component, $value);
+    // Reproduce Webform's behaviour from _webform_client_form_add_component();
+    // all elements are marked as validated already, which means normal Drupal
+    // form validation is bypassed. Webform does its own validation via
+    // webform_client_form_validate().
+    $element['#validated'] = TRUE;
+    $element['#webform_validated'] = FALSE;
   }
 
   $element['#webform_component'] = $component;
