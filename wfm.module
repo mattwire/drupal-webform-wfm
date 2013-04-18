@@ -339,8 +339,8 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
           'wrapper' => $element['#wrapper_id'],
         ),
         '#weight' => $item['#weight'] + 0.001,
-        // As with the 'add more' button, for AJAX to process properly, the
-        // button name needs to be specified as unique to this item.
+        // The remove button's #name property is used to determine which $delta
+        // needs to be removed - see wfm_remove_submit().
         '#name' => $element_name . '_remove_' . $delta,
       );
     }
