@@ -229,7 +229,6 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         '#type' => 'submit',
         '#value' => _wfm_get_add_text($component),
         '#weight' => $initial_weight + 0.5,
-        '#name' => 'add_more',
         '#limit_validation_errors' => array(array('submitted', $form_key)),
         '#submit' => array('wfm_add_more_submit'),
         '#attributes' => array('class' => array('wfm-add')),
@@ -250,9 +249,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
       unset($element['add_more']);
     }
     elseif (!$display) {
-      // Somehow, for AJAX to process properly, the button name needs to be
-      // specified as unique to this item. This might be a cache issue.
-      $element['add_more']['#name'] .= $element_name . '_add_more_' . $delta;
+      $element['add_more']['#name'] = $element_name . '_ADD_' . $delta;
     }
 
     // Define the parents of the item.
@@ -338,9 +335,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
           'wrapper' => $element['#wrapper_id'],
         ),
         '#weight' => $item['#weight'] + 0.001,
-        // The remove button's #name property is used to determine which $delta
-        // needs to be removed - see wfm_remove_submit().
-        '#name' => $element_name . '_remove_' . $delta,
+        '#name' => $element_name . '_REMOVE_' . $delta,
       );
       // Include the remove button within the 'wfm-item' div container.
       $element['remove_' . $delta]['#suffix'] = '</div>';
@@ -375,11 +370,7 @@ function wfm_add_more_submit(&$form, &$form_state) {
  */
 function wfm_remove_submit(&$form, &$form_state) {
   $button = $form_state['triggering_element'];
-  $element = drupal_array_get_nested_value($form, array_slice($button['#array_parents'], 0, -1));
-  $component = $element['#webform_component'];
-  $cid = $component['cid'];
-  $element_name = $element['#name'];
-  $delta = substr($button['#name'], strlen($element_name . '_remove_'));
+  list($element_name, $delta) = explode('_REMOVE_', $button['#name']);
   unset($form_state['wfm_deltas'][$element_name][$delta]);
   $form_state['rebuild'] = TRUE;
 }
