@@ -271,13 +271,6 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
     if (!isset($element[$delta])) {
       $new_element = _wfm_component_generate($component, $display, $default_value, $format);
       $new_element['#weight'] = $initial_weight + ($item_number / 100);
-      // Add wfm CSS classes to the element.
-      if ($delta == $item_count - 1) {
-        $new_element['#attributes']['class'][] = 'wfm-last';
-        if ($final) {
-          $new_element['#attributes']['class'][] = 'wfm-final';
-        }
-      }
       $element[$delta] = $new_element;
     }
 
@@ -326,6 +319,9 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
       ));
     }
 
+    $item['#prefix'] = '<div class="wfm-item">';
+    $item['#suffix'] = '</div>';
+
     // Add a 'Remove' button, to appear just after the form input.
     if ($min_items > 0 && $item_count > $min_items && !$display) {
       $element['remove_' . $delta] = array(
@@ -343,6 +339,9 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         // needs to be removed - see wfm_remove_submit().
         '#name' => $element_name . '_remove_' . $delta,
       );
+      // Include the remove button within the 'wfm-item' div container.
+      $element['remove_' . $delta]['#suffix'] = '</div>';
+      unset($item['#suffix']);
     }
 
     $item_number++;
@@ -681,7 +680,6 @@ function _wfm_component_generate($component, $display = FALSE, $value = NULL, $f
   }
 
   $element['#webform_component'] = $component;
-  $element['#attributes']['class'][] = 'wfm';
 
   drupal_alter(($display ? 'webform_component_display' : 'webform_component_render'), $element, $component);
 

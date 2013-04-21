@@ -2,38 +2,16 @@
  * CSS for the Webform Multiple module.
  */
 
-/* Style the containers used to wrap multiple-value elements */
-.wfm-container {
-  border: 1px dotted #ccc;
-  border-radius: 5px;
-  clear: left;
-  margin: 1em 0;
-  padding: 10px;
-  position: relative;
+/* Style the 'Add another item' button. */
+.wfm-add {
+  margin-bottom: 1em;
+  margin-left: 1em;
+  margin-top: 0.3em;
 }
 
-/* Show the 'Remove' button next to inline elements. */
-.wfm-container .webform-component {
-  clear: left;
-}
-.wfm-container .webform-container-inline {
-  float: left;
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
-  margin-right: 10px;
-  padding-top: 0; padding-bottom: 0;
-}
-.wfm-container .wfm-remove.form-submit {
-  font-size: 0.9em;
-}
-.wfm-container .webform-container-inline + .wfm-remove.form-submit {
-  display: block;
-  float: left;
-  margin: 0.5em 0;
-}
-.wfm-container .wfm-add.form-submit {
-  clear: left;
-  display: block;
-  float: none;
-  margin-top: 1em;
+/* Allow the 'Remove' button to appear next to the element it applies to. */
+.wfm-item > .form-item {
+  display: inline-block;
+  margin-bottom: 0.3em;
+  margin-top: 0.3em;
 }
