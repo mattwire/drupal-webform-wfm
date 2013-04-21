@@ -329,7 +329,10 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
         '#value' => t('Remove'),
         '#limit_validation_errors' => array(),
         '#submit' => array('wfm_remove_submit'),
-        '#attributes' => array('class' => array('wfm-remove')),
+        '#attributes' => array(
+          'class' => array('wfm-remove'),
+          'title' => t('Remove "@title"', array('@title' => $item['#title'])),
+        ),
         '#ajax' => array(
           'callback' => 'wfm_js',
           'wrapper' => $element['#wrapper_id'],
