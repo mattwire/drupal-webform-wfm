@@ -592,7 +592,7 @@ function _wfm_submission_data_to_string(array $data) {
     }
     $output .= $prefix . ': ' . $value . "\n\n";
   }
-  return $output;
+  return trim($output);
 }
 
 /**
