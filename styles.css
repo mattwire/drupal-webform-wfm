@@ -3,7 +3,7 @@
  */
 
 /* Style the 'Add another item' button. */
-.wfm-add {
+.form-submit.wfm-add {
   margin-bottom: 1em;
   margin-left: 1em;
   margin-top: 0.3em;
