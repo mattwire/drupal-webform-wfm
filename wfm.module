@@ -197,10 +197,20 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
 
   // Replace the element with a parent container.
   if (!isset($element['#wfm_wrapper'])) {
-    // Fake the ID that Webform would have given this element. The parent
-    // container gets an ID like "webform-component-key" while the individual
-    // items get IDs such as "webform-component-key--0".
-    $wrapper_id = 'webform-component-' . str_replace('_', '-', $form_key);
+    // Generate the ID that Webform would have given this element if it were a
+    // single instance.
+    //
+    // This ID must remain unique so that the 'Add another item' buttons can
+    // address the right AJAX wrapper (on multiple-instance descendants of
+    // multiple-instance ancestors), but it must also be in the format:
+    //   "webform-component-$form_key"
+    // so that conditionals will work on the first instance. At the moment
+    // there's no way to get conditionals to work on multiple instances without
+    // breaking the HTML specification of unique ID attributes.
+    //
+    // Note that drupal_html_id() will always produce a unique ID, although
+    // unfortunately it isn't fast.
+    $wrapper_id = drupal_html_id('webform-component-' . str_replace('_', '-', $form_key));
     $element = array(
       '#type' => 'container',
       '#wfm_wrapper' => TRUE,
