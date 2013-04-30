@@ -109,12 +109,22 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
 /**
  * Process an element in the Webform to allow multiple values.
  *
+ * This is called recursively, throughout the form element tree.
+ *
  * @param array &$element
  *   The Form API element.
  * @param array &$form_state
  *   The Form API form state.
  * @param stdClass $submission
- *   The Webform submission object.
+ *   The Webform submission object (when displaying or editing an existing
+ *   submission), or an empty array.
+ * @param bool $display
+ *   Whether the element should be themed for display (e.g. when viewing
+ *   results), or as a form input. This is eventually passed on to
+ *   _wfm_component_generate().
+ * @param string $format
+ *   The display format, usually 'html' or 'text' ('html' by default). This is
+ *   also passed on to _wfm_component_generate().
  */
 function _wfm_process_elements(&$element, &$form_state, $submission, $display = FALSE, $format = 'html') {
   $component = $element['#webform_component'];
