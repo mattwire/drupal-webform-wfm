@@ -554,15 +554,27 @@ function _wfm_values_prepare(&$form_state, $components) {
  * Implements hook_webform_submission_create_alter().
  */
 function wfm_webform_submission_create_alter(stdClass $submission, $node, $account, &$form_state) {
-  _wfm_submission_process($submission);
+  // Process a submission when it's being created. Normally this occurs on the
+  // 'preview' step in a form.
+  _wfm_process_submission($submission);
 }
 
 /**
- * Process a submission.
+ * Implements hook_webform_submission_load().
  */
-function _wfm_submission_process(stdClass $submission) {
-  // Expand the submission's data into a multidimensional array stored in a
-  // new property, $submission->wfm_data.
+function wfm_webform_submission_load(&$submissions) {-
+  // Process submissions when they are being loaded from the database: normally
+  // this invoked is when viewing results or when editing an existing
+  // submission.
+  foreach ($submissions as $sid => $submission) {
+    _wfm_process_submission($submission);
+  }
+}
+
+/**
+ * Process a submission to expand data from multiple-value components.
+ */
+function _wfm_process_submission(stdClass $submission) {
   if (isset($submission->wfm_data)) {
     return;
   }
@@ -578,15 +590,6 @@ function _wfm_submission_process(stdClass $submission) {
     }
   }
   _wfm_submission_data_expand_parents($submission->wfm_data, $original_data);
-}
-
-/**
- * Implements hook_webform_submission_load().
- */
-function wfm_webform_submission_load(&$submissions) {
-  foreach ($submissions as $sid => $submission) {
-    _wfm_submission_process($submission);
-  }
 }
 
 /**
