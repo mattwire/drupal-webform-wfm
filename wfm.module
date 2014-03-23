@@ -412,8 +412,10 @@ function wfm_validate($form, &$form_state) {
   // Prepare the $form_state so it can be processed by the Webform validator,
   // and save the values in their original form because they may be needed
   // later.
-  $original_submitted = $form_state['values']['submitted'];
-  _wfm_values_prepare($form_state, $components);
+  if (isset($form_state['values']['submitted'])) {
+    $original_submitted = $form_state['values']['submitted'];
+    _wfm_values_prepare($form_state, $components);
+  }
 
   // Run the Webform validator.
   webform_client_form_validate($form, $form_state);
@@ -421,7 +423,7 @@ function wfm_validate($form, &$form_state) {
   // If the form needs to be rebuilt, for example if there were validation
   // errors, then reset the $form_state array to its original structure (the
   // structure it had before _wfm_values_prepare() was run).
-  if (form_get_errors() || !empty($form_state['rebuild'])) {
+  if (isset($original_submitted) && (form_get_errors() || !empty($form_state['rebuild']))) {
     $form_state['values']['submitted'] = $original_submitted;
   }
 
