@@ -562,7 +562,7 @@ function wfm_webform_submission_create_alter(stdClass $submission, $node, $accou
 /**
  * Implements hook_webform_submission_load().
  */
-function wfm_webform_submission_load(&$submissions) {-
+function wfm_webform_submission_load(&$submissions) {
   // Process submissions when they are being loaded from the database: normally
   // this invoked is when viewing results or when editing an existing
   // submission.
