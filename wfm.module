@@ -585,6 +585,9 @@ function _wfm_process_submission(stdClass $submission) {
   $original_data = $submission->data;
   $submission->wfm_data = array();
   foreach ($submission->data as $cid => $data) {
+    if (!isset($components[$cid])) {
+      continue;
+    }
     $component = $components[$cid];
     $submission->wfm_data[$cid] = _wfm_submission_data_expand($data);
     if (_wfm_is_multiple_recursive($component, $components)) {
