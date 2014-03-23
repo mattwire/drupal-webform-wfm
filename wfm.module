@@ -96,6 +96,9 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
   // Process form elements so that they can have multiple instances.
   $form_keys = element_children($form['submitted']);
   foreach ($form_keys as $form_key) {
+    if (!$form['submitted'][$form_key]) {
+      continue;
+    }
     _wfm_process_elements($form['submitted'][$form_key], $form_state, $form['#submission']);
   }
 
@@ -548,26 +551,41 @@ function _wfm_values_prepare(&$form_state, $components) {
 }
 
 /**
+ * Implements hook_webform_submission_create_alter().
+ */
+function wfm_webform_submission_create_alter(stdClass $submission, $node, $account, &$form_state) {
+  _wfm_submission_process($submission);
+}
+
+/**
+ * Process a submission.
+ */
+function _wfm_submission_process(stdClass $submission) {
+  // Expand the submission's data into a multidimensional array stored in a
+  // new property, $submission->wfm_data.
+  if (isset($submission->wfm_data)) {
+    return;
+  }
+  $node = node_load($submission->nid);
+  $components = $node->webform['components'];
+  $original_data = $submission->data;
+  $submission->wfm_data = array();
+  foreach ($submission->data as $cid => $data) {
+    $component = $components[$cid];
+    $submission->wfm_data[$cid] = _wfm_submission_data_expand($data);
+    if (_wfm_is_multiple_recursive($component, $components)) {
+      $submission->data[$cid] = (array) _wfm_submission_data_to_string($data);
+    }
+  }
+  _wfm_submission_data_expand_parents($submission->wfm_data, $original_data);
+}
+
+/**
  * Implements hook_webform_submission_load().
  */
 function wfm_webform_submission_load(&$submissions) {
   foreach ($submissions as $sid => $submission) {
-    // Expand the submission's data into a multidimensional array stored in a
-    // new property, $submission->wfm_data.
-    if (!isset($submission->wfm_data)) {
-      $node = node_load($submission->nid);
-      $components = $node->webform['components'];
-      $original_data = $submission->data;
-      $submission->wfm_data = array();
-      foreach ($submission->data as $cid => $data) {
-        $component = $components[$cid];
-        $submission->wfm_data[$cid] = _wfm_submission_data_expand($data);
-        if (_wfm_is_multiple_recursive($component, $components)) {
-          $submission->data[$cid] = (array) _wfm_submission_data_to_string($data);
-        }
-      }
-      _wfm_submission_data_expand_parents($submission->wfm_data, $original_data);
-    }
+    _wfm_submission_process($submission);
   }
 }
 
@@ -696,7 +714,7 @@ function _wfm_component_generate($component, $display = FALSE, $value = NULL, $f
 /**
  * Check whether a component takes multiple values.
  */
-function _wfm_is_multiple($component) {
+function _wfm_is_multiple(array $component) {
   $max_items = _wfm_get_max_items($component);
   return $max_items > 1 || $max_items == WFM_UNLIMITED;
 }
