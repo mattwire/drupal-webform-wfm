@@ -556,9 +556,10 @@ function _wfm_values_prepare(&$form_state, $components) {
  * Implements hook_webform_submission_create_alter().
  */
 function wfm_webform_submission_create_alter(stdClass $submission, $node, $account, &$form_state) {
-  // Process a submission when it's being created. Normally this occurs on the
-  // 'preview' step in a form.
-  _wfm_process_submission($submission);
+  // Process a submission when it's being created for a preview.
+  if ($submission->preview) {
+    _wfm_process_submission($submission);
+  }
 }
 
 /**
