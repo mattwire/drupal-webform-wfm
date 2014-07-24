@@ -143,7 +143,7 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   $form_state['wfm_ancestors'][$cid][implode('.', $element_parents)] = $element_parents;
 
   // Stop processing if this component does not accept multiple values.
-  if (!_wfm_is_multiple($component)) {
+  if (empty($component) || !_wfm_is_multiple($component)) {
     // Recurse through the element's children.
     foreach (element_children($element) as $key) {
       $sub_element = &$element[$key];
@@ -589,9 +589,11 @@ function _wfm_process_submission(stdClass $submission) {
     if (!isset($components[$cid])) {
       continue;
     }
-    $component = $components[$cid];
     $submission->wfm_data[$cid] = _wfm_submission_data_expand($data);
-    if (_wfm_is_multiple_recursive($component, $components)) {
+    // For multiple-value components or those descending from multiple-value
+    // ancestors, modify $submission->data so that it contains a single
+    // string for each component.
+    if (_wfm_is_multiple_recursive($components[$cid], $components)) {
       $submission->data[$cid] = (array) _wfm_submission_data_to_string($data);
     }
   }
