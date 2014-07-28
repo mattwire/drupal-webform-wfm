@@ -82,8 +82,7 @@ function wfm_webform_submission_render_alter(&$renderable) {
     // Pass in a dummy $form_state array.
     $form_state = array();
     foreach (element_children($renderable) as $form_key) {
-      $element = &$renderable[$form_key];
-      _wfm_process_elements($element, $form_state, $submission, TRUE, $format);
+      _wfm_process_elements($renderable[$form_key], $form_state, $submission, TRUE, $format);
     }
   }
 }
@@ -96,9 +95,6 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
   // Process form elements so that they can have multiple instances.
   $form_keys = element_children($form['submitted']);
   foreach ($form_keys as $form_key) {
-    if (!$form['submitted'][$form_key]) {
-      continue;
-    }
     _wfm_process_elements($form['submitted'][$form_key], $form_state, $form['#submission']);
   }
 
@@ -130,6 +126,10 @@ function wfm_form_webform_client_form_alter(&$form, &$form_state) {
  *   also passed on to _wfm_component_generate().
  */
 function _wfm_process_elements(&$element, &$form_state, $submission, $display = FALSE, $format = 'html') {
+  if (!$element || !isset($element['#webform_component'])) {
+    return;
+  }
+
   $component = $element['#webform_component'];
   $form_key = $component['form_key'];
   $cid = $component['cid'];
@@ -146,10 +146,10 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
   if (empty($component) || !_wfm_is_multiple($component)) {
     // Recurse through the element's children.
     foreach (element_children($element) as $key) {
-      $sub_element = &$element[$key];
-      if (!isset($sub_element['#webform_component'])) {
+      if (!$element[$key] || !isset($element[$key]['#webform_component'])) {
         continue;
       }
+      $sub_element = &$element[$key];
       $sub_component = $sub_element['#webform_component'];
       $scid = $sub_element['#webform_component']['cid'];
       $sub_element['#name'] = $element_name . "[$key]";
