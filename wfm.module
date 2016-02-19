@@ -590,39 +590,10 @@ function _wfm_process_submission(stdClass $submission) {
       continue;
     }
     $submission->wfm_data[$cid] = _wfm_submission_data_expand($data);
-    // For multiple-value components or those descending from multiple-value
-    // ancestors, modify $submission->data so that it contains a single
-    // string for each component.
-    if (_wfm_is_multiple_recursive($components[$cid], $components)) {
-      $submission->data[$cid] = (array) _wfm_submission_data_to_string($data);
-    }
   }
   _wfm_submission_data_expand_parents($submission->wfm_data, $original_data);
 }
 
-/**
- * Convert submission data into a descriptive string.
- */
-function _wfm_submission_data_to_string(array $data) {
-  // Go through each value (as loaded from the database), and find a prefix
-  // consisting of the item number ($delta + 1), potentially preceded by the
-  // item numbers of its ancestors separated by > (a bit like a breadcrumb).
-  $output = '';
-  foreach ($data as $key => $value) {
-    if (preg_match_all('/#([0-9]+)/', $key, $deltas)) {
-      $deltas = $deltas[1];
-      foreach ($deltas as &$delta) {
-        $delta++;
-      }
-      $prefix = implode('>', $deltas);
-    }
-    else {
-      $prefix = $key + 1;
-    }
-    $output .= $prefix . ': ' . $value . "\n\n";
-  }
-  return trim($output);
-}
 
 /**
  * Expand submission data into a multi-dimensional array.
