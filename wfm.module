@@ -191,7 +191,9 @@ function _wfm_process_elements(&$element, &$form_state, $submission, $display = 
     if (is_array($element_value)) {
       $deltas = array_keys($element_value);
       foreach ($deltas as $delta) {
-        $element_deltas[$delta] = $delta;
+        if (is_numeric($delta)) {
+          $element_deltas[$delta] = $delta;
+        }
       }
     }
   }
