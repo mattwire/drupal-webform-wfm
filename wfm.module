@@ -480,6 +480,19 @@ function _wfm_values_prepare(&$form_state, $components) {
     }
 
     // Loop through all the possible family trees for this component.
+    if (!isset($component_ancestors[$cid])) {
+      $child_element = $components[$cid];
+      $ancestors = array($child_element['form_key']);
+      $ancestors_key = $child_element['form_key'];
+      while ($child_element['pid'] != 0) {
+        $child_element = $components[$child_element['pid']];
+        array_unshift($ancestors, $child_element['form_key']);
+        $ancestors_key = $child_element['form_key'] . '.' . $ancestors_key;
+      }
+      array_unshift($ancestors, 'submitted');
+      $ancestors_key = 'submitted.' . $ancestors_key;
+      $component_ancestors[$cid][$ancestors_key] = $ancestors;
+    }
     foreach ($component_ancestors[$cid] as $ancestors) {
       // Remove 'submitted' from the ancestors array.
       array_shift($ancestors);
