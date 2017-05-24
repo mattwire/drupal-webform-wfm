@@ -799,6 +799,7 @@ function _wfm_array_unset_nested_value(array &$array, array $parents, &$key_exis
  */
 function _wfm_compatible_components() {
   $types = array(
+    'date',
     'email',
     'fieldset',
     'name',
